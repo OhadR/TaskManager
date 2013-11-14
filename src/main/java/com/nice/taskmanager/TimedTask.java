@@ -1,7 +1,7 @@
 package com.nice.taskmanager;
 
 
-public class TimedTask extends Task 
+public class TimedTask extends Task implements Comparable<TimedTask>
 {
 	private long reInsertionDate;
 
@@ -28,5 +28,16 @@ public class TimedTask extends Task
 	public boolean timeHasPassed()
 	{
 		return System.currentTimeMillis() >= reInsertionDate;
+	}
+
+	@Override
+	public int compareTo(TimedTask o) 
+	{
+		if(reInsertionDate == o.reInsertionDate)
+			return 0;
+		if(reInsertionDate < o.reInsertionDate)
+			return -1;
+		else 
+			return 1;
 	}
 }

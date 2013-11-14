@@ -3,8 +3,10 @@ package com.nice.taskmanager;
 
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.InputMismatchException;
 import java.util.List;
+import java.util.ListIterator;
+import java.util.SortedSet;
+import java.util.TreeSet;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
 
@@ -25,7 +27,8 @@ public class TaskManager
 	private List< BlockingQueue<Task> > vector = new ArrayList< BlockingQueue<Task> >();
 
 	//"waiting list":
-	private List<TimedTask> reoccurences = new ArrayList<TimedTask>();
+	//keep them sorted by the timeToInsert, so if we have many items we do not have to iterate all:
+	private SortedSet<TimedTask> reoccurences = new TreeSet<TimedTask>();
 	
 	
 	public TaskManager()
@@ -96,6 +99,11 @@ public class TaskManager
 			{
 				insertTask(timedTask.jobNumber, timedTask.priority, timedTask.interval);
 			}
+			else		//we meet item that its time hasn;t arrived - so we can stop iteration
+				//this structure is sorted by the time-to-insert
+			{
+				return;
+			}
 		}
 	}
 
@@ -105,8 +113,11 @@ public class TaskManager
 	 */
 	public int getNextJob()
 	{
-		for( BlockingQueue<Task> q : vector )
+		//NOTE: reverse iteration 
+		for(ListIterator< BlockingQueue<Task> > it = vector.listIterator(vector.size()); it.hasPrevious(); )
+		//for(BlockingQueue<Task> q : vector)
 		{
+			BlockingQueue<Task> q = it.previous();
 			Task task = q.poll(); 		//TODO: check poll()
 			if( task == null)
 				continue;		//to the next Q
