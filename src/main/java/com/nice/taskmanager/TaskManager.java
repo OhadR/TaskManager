@@ -29,6 +29,8 @@ public class TaskManager
 	//"waiting list":
 	//keep them sorted by the timeToInsert, so if we have many items we do not have to iterate all:
 	private SortedSet<TimedTask> reoccurences = new TreeSet<TimedTask>();
+
+	private boolean checkWaitingList = true;
 	
 	
 	public TaskManager()
@@ -61,7 +63,8 @@ public class TaskManager
 	 */
 	public boolean insertTask(int jobNumber, int priority, int interval) throws IOException
 	{
-		handleWaitingReoccurences();
+		if(checkWaitingList)
+			handleWaitingReoccurences();
 
 		//validate input....
 		if(priority < PRIORITY_LOW || priority > PRIORITY_HIGH)
@@ -93,6 +96,8 @@ public class TaskManager
 	
 	private void handleWaitingReoccurences() throws IOException
 	{
+		checkWaitingList = false;	//to avoid recursion
+		
 		for(TimedTask timedTask : reoccurences)
 		{
 			if(timedTask.timeHasPassed())
@@ -105,14 +110,19 @@ public class TaskManager
 				return;
 			}
 		}
+		
+		checkWaitingList = true;	//to avoid recursion
 	}
 
 	/**
 	 * gets the highest priority task. seach in all Qs, by priority
 	 * @return -1 if no jobs are available
+	 * @throws IOException 
 	 */
-	public int getNextJob()
+	public int getNextJob() throws IOException
 	{
+		handleWaitingReoccurences();
+
 		//NOTE: reverse iteration 
 		for(ListIterator< BlockingQueue<Task> > it = vector.listIterator(vector.size()); it.hasPrevious(); )
 		//for(BlockingQueue<Task> q : vector)
