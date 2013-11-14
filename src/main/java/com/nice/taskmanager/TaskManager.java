@@ -61,9 +61,9 @@ public class TaskManager
 	 * @return false if there is no space for this new task. true if successful
 	 * @throws IOException 
 	 */
-	public boolean insertTask(int jobNumber, int priority, int interval) throws IOException
+	public synchronized boolean insertTask(int jobNumber, int priority, int interval) throws IOException
 	{
-		if(checkWaitingList)
+		if(checkWaitingList)					//avoid recursion
 			handleWaitingReoccurences();
 
 		//validate input....
