@@ -30,8 +30,6 @@ public class TaskManager
 	//keep them sorted by the timeToInsert, so if we have many items we do not have to iterate all:
 	private SortedSet<TimedTask> reoccurences = new TreeSet<TimedTask>();
 
-	private boolean checkWaitingList = true;
-	
 	
 	public TaskManager()
 	{
@@ -61,11 +59,16 @@ public class TaskManager
 	 * @return false if there is no space for this new task. true if successful
 	 * @throws IOException 
 	 */
-	public synchronized boolean insertTask(int jobNumber, int priority, int interval) throws IOException
+	public boolean insertTask(int jobNumber, int priority, int interval) throws IOException
 	{
-		if(checkWaitingList)					//avoid recursion
-			handleWaitingReoccurences();
+		handleWaitingReoccurences();
 
+		return innerInsertTask(jobNumber, priority, interval);				
+	}
+
+	
+	private boolean innerInsertTask(int jobNumber, int priority, int interval) throws IOException
+	{
 		//validate input....
 		if(priority < PRIORITY_LOW || priority > PRIORITY_HIGH)
 		{
@@ -93,16 +96,15 @@ public class TaskManager
 		return q.offer(taskToInsert);
 				
 	}
+
 	
 	private void handleWaitingReoccurences() throws IOException
 	{
-		checkWaitingList = false;	//to avoid recursion
-		
 		for(TimedTask timedTask : reoccurences)
 		{
 			if(timedTask.timeHasPassed())
 			{
-				insertTask(timedTask.jobNumber, timedTask.priority, timedTask.interval);
+				innerInsertTask(timedTask.jobNumber, timedTask.priority, timedTask.interval);
 			}
 			else		//we meet item that its time hasn;t arrived - so we can stop iteration
 				//this structure is sorted by the time-to-insert
@@ -110,8 +112,6 @@ public class TaskManager
 				return;
 			}
 		}
-		
-		checkWaitingList = true;	//to avoid recursion
 	}
 
 	/**
