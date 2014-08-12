@@ -12,8 +12,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Component;
 
+import com.ohadr.cbenchmarkr.interfaces.ICacheRepository;
 import com.ohadr.cbenchmarkr.interfaces.ITrainee;
-import com.ohadr.cbenchmarkr.interfaces.IRepository;
 import com.ohadr.cbenchmarkr.utils.MailSenderWrapper;
 import com.ohadr.cbenchmarkr.utils.TimedResult;
 
@@ -28,7 +28,7 @@ public class Manager implements InitializingBean
 
     @Autowired
 	@Qualifier("repositoryCacheImpl")
-	private IRepository				repository;
+	private ICacheRepository		repository;
     
 	@Autowired
 	private WorkoutMetadataContainer workoutMetadataContainer;
@@ -46,17 +46,21 @@ public class Manager implements InitializingBean
 	}
 
 
-	public void addWorkoutForTrainee(String trainee, Workout workout) throws BenchmarkrRuntimeException 
+	public void addWorkoutForTrainee(String traineeId, Workout workout) throws BenchmarkrRuntimeException 
 	{
 		validateWorkout( workout.getName() );
-		repository.addWorkoutForTrainee( trainee, workout );
+		repository.addWorkoutForTrainee( traineeId, workout );
 		
-//		calcAveragesAndGrades();
+		//do not re-calc all averages (@calcAveragesAndGrades()), instead use in-mem averages to calc locally the diff:
+		double grade = gradesCalculator.recalcForTrainee( traineeId, workout );
+		log.debug( traineeId + ": new total grade (averages were not calced!)= " + grade );
+		ITrainee trainee = repository.getTraineesCache().get( traineeId );
+		trainee.setTotalGrade( grade );
 		
 		mailSenderWrapper.notifyAdmin("ohad.redlich@gmail.com",
 				"cBenchmarkr: new workout registered",
-				"a new user has registered WOD-result" );
-		
+				"user " + traineeId + " has registered WOD-result for " + workout.getName() );
+						
 	}
 
 
@@ -89,10 +93,9 @@ public class Manager implements InitializingBean
 	
 	public Collection<ITrainee> getSortedTraineesByGrade()
 	{
-		Collection<ITrainee> trainees = repository.getAllTrainees();
-		List<ITrainee> traineesAsList = (List<ITrainee>) trainees;
-		Collections.sort( traineesAsList );
-		return traineesAsList;
+		List<ITrainee> trainees = repository.getTrainees();
+		Collections.sort( trainees );
+		return trainees;
 	}
 	
 	public List<TimedResult> getWorkoutHistoryForTrainee( String trainee, String workoutName ) throws BenchmarkrRuntimeException
@@ -121,6 +124,7 @@ public class Manager implements InitializingBean
 		if( authenticatedUsername.startsWith("ohad.redlich"))
 		{
 			repository.setAdmin( authenticatedUsername );
+	        log.info( "trainee: " + authenticatedUsername + " was set as admin" );
 			return true;
 		}
 		return false;
@@ -133,11 +137,14 @@ public class Manager implements InitializingBean
 	}
 
 
-	public void createBenchmarkrAccount(String traineeId, boolean isMale,
+	public void createBenchmarkrAccount(String traineeId, String firstName, String lastName, boolean isMale,
 			Date dateOfBirth) throws BenchmarkrRuntimeException 
 	{
-        log.info( "traineeId: " + traineeId + ", isMale? " + isMale + ", DOB=" + dateOfBirth );
-		repository.createBenchmarkrAccount( traineeId, isMale, dateOfBirth );
+        log.info( "traineeId: " + traineeId + ", firstName: " + firstName + ", isMale? " + isMale + ", DOB=" + dateOfBirth );
+		repository.createBenchmarkrAccount( traineeId, firstName, lastName, isMale, dateOfBirth );
+		
+		//if it is 'ohad.redlich' - make it admin
+		setAdmin( traineeId );
 	}
 
 

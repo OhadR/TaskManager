@@ -1,15 +1,14 @@
 package com.ohadr.cbenchmarkr;
 
 import java.util.*;
-import java.util.Map.Entry;
 
 import org.apache.log4j.Logger;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Component;
 
+import com.ohadr.cbenchmarkr.interfaces.ICacheRepository;
 import com.ohadr.cbenchmarkr.interfaces.ITrainee;
-import com.ohadr.cbenchmarkr.interfaces.IRepository;
 
 @Component
 public class GradesCalculator
@@ -18,22 +17,11 @@ public class GradesCalculator
 	
 	@Autowired
 	@Qualifier("repositoryCacheImpl")
-	private IRepository			repository;
+	private ICacheRepository			repository;
 	
 	@Autowired
 	private WorkoutMetadataContainer workoutMetadataContainer;
 
-	/**
-	 * maps from WOD-name to its average:
-	 */
-	private Map<String, Integer> averageGrades = new HashMap<String, Integer>();
-
-	
-	public void setRepositoty(IRepository repository)
-	{
-		this.repository = repository;
-	}
-	
 	public void calcAveragesAndGrades() throws BenchmarkrRuntimeException
 	{
 		calcAverages();
@@ -43,26 +31,23 @@ public class GradesCalculator
 	
 	private void calcAverages()
 	{
-		//all Persons And Wods Map. 'bigMap' maps from person-id to this person's results' map:
-		Map< String, Map<String, Integer> > bigMap = new HashMap< String, Map<String, Integer> >();
+		Map<String, Integer> averageGrades = repository.getAveragesForWorkouts();
 
-		Collection<ITrainee> persons = repository.getAllTrainees();
-		for( ITrainee person : persons )
-		{
-			bigMap.put( person.getId(), person.getResultsMap() );
-		}
-		
 		//calc the averages for all wods:
 		log.info("calc the averages");
+		
+		Collection<ITrainee> allTrainees = repository.getTraineesCache().values();
+
 		for( String wod : workoutMetadataContainer.getAllWorkoutsNames() )
 		{
-			log.info( "calc the averages for " + wod );
+			log.debug( "calc the averages for " + wod );
 			int sum = 0;
 			int workoutParticipants = 0;
-			Collection<Map<String, Integer>> allWodsOfAllPersons = bigMap.values();
-			for(Map<String, Integer> resultsOfSomeone : allWodsOfAllPersons)
+			
+			for(ITrainee trainee : allTrainees)
 			{
-				Integer wodResult = resultsOfSomeone.get(wod);
+				Map<String, Integer> resultsOfSomeone = trainee.getResultsMap();
+				Integer wodResult = resultsOfSomeone.get( wod );
 				if(wodResult != null)		//in case a person did not do this workout
 				{
 					int result = wodResult;
@@ -89,55 +74,77 @@ public class GradesCalculator
 	private Map<String, Double> calcGrades()
 	{
 		log.info("calc the grades");
-		Collection<ITrainee> persons = repository.getAllTrainees();
+		Collection<ITrainee> persons = repository.getTraineesCache().values();
 		Map<String, Double> gradesPerTrainee = new HashMap<String, Double>();
 
 		for( ITrainee person : persons )
 		{
-			log.debug("calc the grades for " + person.getId());
-			int totalGradeForPerson = 0;
-			int numWorkoutsForPerson = 0;
-
-			//calc the diff:
-			Map<String, Integer> results = person.getResultsMap();
-			for( String workoutName : results.keySet() )
-			{
-				++numWorkoutsForPerson;
-				int result = results.get( workoutName );
-				log.debug("*** result= " + result + "averageGrades= " + averageGrades);
-				log.debug( "*** workoutName= " + workoutName );
-				int diff = result - averageGrades.get( workoutName );
-				
-				
-				//consider type of wod: if it is TIMED (not reps), then decrease:
-				WorkoutMetadata workoutMetadata = workoutMetadataContainer.getWorkoutMetadataByName( workoutName );
-				if( workoutMetadata.isRepetitionBased() )
-				{
-					totalGradeForPerson += diff;
-				}
-				else
-				{
-					totalGradeForPerson -= diff;
-				}
-
-				log.debug(person.getId() + ": " + workoutName + ": diff= " + diff);
-			}
-
-			double grade = (double)totalGradeForPerson / numWorkoutsForPerson;
-			log.debug(person.getId() + ": total grade= " + grade);
+			double grade = calcGradeForTrainee( person );
 			
 			gradesPerTrainee.put(person.getId(), grade);
 		}
 		
 		return gradesPerTrainee;		
 	}
-	
-	public void logAverages()
+
+	private double calcGradeForTrainee(	ITrainee person )
 	{
-		log.info("log averages");
-		for( Entry<String, Integer> pair : averageGrades.entrySet() )
+		log.info("calc the grades for " + person.getId());
+		Map<String, Integer> averageGrades = repository.getAveragesForWorkouts();
+		
+		if( averageGrades.isEmpty() )
 		{
-			log.info( pair.getKey() + " : " + pair.getValue() );
-		}		
+			calcAverages();			
+		}
+		
+		int totalGradeForPerson = 0;
+		int numWorkoutsForPerson = 0;
+
+		//calc the diff:
+		Map<String, Integer> results = person.getResultsMap();
+		for( String workoutName : results.keySet() )
+		{
+			log.debug( "calc grade for workoutName= " + workoutName );
+			++numWorkoutsForPerson;
+			int result = results.get( workoutName );
+			int averageForWorkout = averageGrades.get( workoutName );
+			int diff = result - averageForWorkout;
+
+			log.info( " workoutName= " + workoutName + ", result= " + result + 
+					", averageForWorkout= " + averageForWorkout + ", diff= " + diff);
+			
+			//consider type of wod: if it is TIMED (not reps), then decrease:
+			WorkoutMetadata workoutMetadata = workoutMetadataContainer.getWorkoutMetadataByName( workoutName );
+			if( workoutMetadata.isRepetitionBased() )
+			{
+				totalGradeForPerson += diff;
+			}
+			else
+			{
+				totalGradeForPerson -= diff;
+			}
+		}
+
+		log.info(person.getId() + ": totalGradeForPerson= " + totalGradeForPerson + ", numWorkoutsForPerson= " + numWorkoutsForPerson);
+		double grade = (double)totalGradeForPerson / numWorkoutsForPerson;
+		log.info(person.getId() + ": total grade= " + grade);
+		return grade;
 	}
+	
+	/**
+	 * when user updates a new WOD-result, we do not want to re-calc all averages, because it is heavy and expensive to
+	 * go to DB and update each time. so we do "half the way" - calc a new grade bades on old averages, but with
+	 * the new result
+	 * @param trainee
+	 * @param workout
+	 */
+	public double recalcForTrainee(String traineeId, Workout workout)
+	{
+		//cache was updated with the new result by the manager. so now we just re-calc the grade:
+		Map<String, ITrainee> trainees = repository.getTraineesCache();
+		ITrainee trainee = trainees.get( traineeId );
+		double grade = calcGradeForTrainee( trainee );
+		return grade;
+	}
+	
 }

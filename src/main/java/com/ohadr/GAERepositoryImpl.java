@@ -2,7 +2,6 @@ package com.ohadr.cbenchmarkr;
 
 import java.util.*;
 
-import org.apache.commons.lang.NotImplementedException;
 import org.apache.log4j.Logger;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.core.userdetails.UserDetails;
@@ -31,10 +30,8 @@ public class GAERepositoryImpl implements IRepository
 	private static Logger log = Logger.getLogger(GAERepositoryImpl.class);
 	private static final String USERNAME_PROP_NAME = "username";
 	private static final String TOTAL_GRADE_PROP_NAME = "total_grade";
-//	private static final String WORKOUT_NAME_PROP_NAME = "workout_name";
 
 	private static final String USER_DB_KIND = "Users";
-//	private static final String WORKOUTS_DB_KIND = "Workouts";
 	private static final String HISTORY_DB_KIND = "History";
 
 
@@ -49,8 +46,8 @@ public class GAERepositoryImpl implements IRepository
 	}
 
 	/**
-	 * method makes sure that @workout does not already exist. 
-	 * @throws BenchmarkrRuntimeException 
+	 * this method adds the workout both to "user" table, and to the "hostory" table. It also makes sure that @workout does not already exist. 
+	 * @throws BenchmarkrRuntimeException - if this workout already exists
 	 */
 	@Override
 	public void addWorkoutForTrainee(String trainee, Workout workout) throws BenchmarkrRuntimeException 
@@ -78,6 +75,13 @@ public class GAERepositoryImpl implements IRepository
 		datastore.put( historyEntity );
 	}
 	
+	/**
+	 * add workout to the history table of the trainee. if this workout already exists, it throws an exception
+	 * @param trainee
+	 * @param workout
+	 * @return
+	 * @throws BenchmarkrRuntimeException - if this workout already exists
+	 */
 	private Entity addWorkoutForTraineeInHistoryTable(String trainee, Workout workout) throws BenchmarkrRuntimeException
 	{
 		Entity historyEntity = getHistoryEntity( trainee );
@@ -138,20 +142,6 @@ public class GAERepositoryImpl implements IRepository
 		
 	}
 	
-/*	@Override
-	public UserOrder getUserEntry(String username)
-	{
-		Entity entity = getUserEntity(username);
-		
-		UserOrder uo = null; 
-		if(entity != null)
-		{
-			uo = convertEntityToTimedUserOrder(entity);
-		}
-		
-		return uo;
-	}*/
-
 	private Entity getUserEntity(String username)
 	{
 		return getEntityFromDB( username, USER_DB_KIND );
@@ -187,17 +177,11 @@ public class GAERepositoryImpl implements IRepository
 		return entity;
 	}
 
-	public List<Workout> getAllWorkouts() {
-		// TODO Auto-generated method stub
-		return null;
-	}
-
-
 	/**
 	 * returns all the trainees that have registered a WOD-result.
 	 */
 	@Override
-	public List<ITrainee> getAllTrainees()
+	public List<ITrainee> getTrainees()
 	{
 		log.debug("getAllTrainees()");
 		Query q = new Query(USER_DB_KIND);
@@ -215,7 +199,24 @@ public class GAERepositoryImpl implements IRepository
 		return retVal;
 	}
 
-	private ITrainee convertEntityToTrainee(Entity entity)
+	/**
+	 * we Cache-Repo calls this method if a Trainee is needed but is not in the cache. 
+	 * return a Trainee object, even if he hasn't enter any WOD-result.
+	 */
+	@Override
+	public ITrainee getTrainee(String traineeId)
+	{
+		Entity dbUser = getUserEntity( traineeId );
+		if( dbUser == null )		//this is the case if user hasn't enter any result, so we don't have an entry in "Users" table
+		{
+			return null;
+		}
+		
+		ITrainee trainee = convertEntityToTrainee( dbUser );
+		return trainee;
+	}
+
+	private final ITrainee convertEntityToTrainee(Entity entity)
 	{
 		StringBuffer sb = new StringBuffer();
 		String username = (String) entity.getKey().getName();		//the username is the key...
@@ -267,7 +268,7 @@ public class GAERepositoryImpl implements IRepository
 			traineeResults.put(entry.getKey(), val);
 		}
 		log.debug("trainee was read from DB: " + sb.toString());
-		ITrainee trainee = new Trainee( username, 
+		final ITrainee trainee = new Trainee( username, 
 				firstName,
 				lastName,
 				traineeResults,
@@ -425,9 +426,11 @@ public class GAERepositoryImpl implements IRepository
 		return retVal;
 	}
 
+
 	@Override
-	public void createBenchmarkrAccount(String traineeId, boolean isMale,
-			Date dateOfBirth) throws BenchmarkrRuntimeException 
+	public void createBenchmarkrAccount(String traineeId, String firstName,
+			String lastName, boolean isMale, Date dateOfBirth)
+			throws BenchmarkrRuntimeException
 	{
 		BenchmarkrAuthenticationFlowsRepositoryImpl benchmarkrAuthenticationFlowsRepository = 
 				(BenchmarkrAuthenticationFlowsRepositoryImpl)authFlowsRepository;
@@ -467,11 +470,5 @@ public class GAERepositoryImpl implements IRepository
 			//disable this user in auth-flows (rather than delete it):
 			authFlowsRepository.setDisabled( result.getKey().getName() );
 		}		
-	}
-
-	@Override
-	public int getNumberOfRegisteredResults()
-	{
-		throw new NotImplementedException();
 	}
 }
