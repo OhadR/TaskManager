@@ -35,6 +35,8 @@ public class Manager implements InitializingBean
 
 	@Autowired
 	private MailSenderWrapper mailSenderWrapper;
+
+	private boolean needToCalcGrades = true;
     
 
 	@Override
@@ -56,6 +58,9 @@ public class Manager implements InitializingBean
 		log.debug( traineeId + ": new total grade (averages were not calced!)= " + grade );
 		ITrainee trainee = repository.getTraineesCache().get( traineeId );
 		trainee.setTotalGrade( grade );
+		
+		//indicate that averages and grades need to be re-calced:
+		needToCalcGrades = true;
 		
 		mailSenderWrapper.notifyAdmin("ohad.redlich@gmail.com",
 				"cBenchmarkr: new workout registered",
@@ -82,12 +87,24 @@ public class Manager implements InitializingBean
 	
 	public void calcAveragesAndGrades() throws BenchmarkrRuntimeException
 	{
-		gradesCalculator.calcAveragesAndGrades();
+		if( needToCalcGrades )
+		{
+			gradesCalculator.calcAveragesAndGrades();
+
+			//place this AFTER the calc, so if we have exception in the calc, we will try to re-calc:
+			needToCalcGrades = false;
+		}
+		else
+		{
+			log.info("no need to re-calc the averages&grades");
+		}
 	}
 
 	public void addWorkout(WorkoutMetadata workoutMD)
 	{
 		workoutMetadataContainer.addWorkoutMetadata( workoutMD );
+		
+		repository.clearAveragesForWorkouts();
 	}
 	
 	
@@ -137,11 +154,10 @@ public class Manager implements InitializingBean
 	}
 
 
-	public void createBenchmarkrAccount(String traineeId, String firstName, String lastName, boolean isMale,
+	public void createBenchmarkrAccount(String traineeId, boolean isMale,
 			Date dateOfBirth) throws BenchmarkrRuntimeException 
 	{
-        log.info( "traineeId: " + traineeId + ", firstName: " + firstName + ", isMale? " + isMale + ", DOB=" + dateOfBirth );
-		repository.createBenchmarkrAccount( traineeId, firstName, lastName, isMale, dateOfBirth );
+		repository.createBenchmarkrAccount( traineeId, isMale, dateOfBirth );
 		
 		//if it is 'ohad.redlich' - make it admin
 		setAdmin( traineeId );
@@ -157,6 +173,19 @@ public class Manager implements InitializingBean
 	public int getNumberOfRegisteredResults()
 	{
 		return repository.getNumberOfRegisteredResults();
+	}
+
+
+	public void updateBenchmarkrAccount(String traineeId,
+			String firstName, String lastName, Date dateOfBirth)
+	{
+		repository.updateBenchmarkrAccount( traineeId, firstName, lastName, dateOfBirth );
+	}
+
+
+	public ITrainee getTraineeById(String traineeId)
+	{
+		return repository.getTraineeFromCache( traineeId );
 	}
 
 

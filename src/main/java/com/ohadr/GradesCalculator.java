@@ -9,6 +9,7 @@ import org.springframework.stereotype.Component;
 
 import com.ohadr.cbenchmarkr.interfaces.ICacheRepository;
 import com.ohadr.cbenchmarkr.interfaces.ITrainee;
+import com.ohadr.cbenchmarkr.utils.Utils;
 
 @Component
 public class GradesCalculator
@@ -127,9 +128,11 @@ public class GradesCalculator
 
 		log.info(person.getId() + ": totalGradeForPerson= " + totalGradeForPerson + ", numWorkoutsForPerson= " + numWorkoutsForPerson);
 		double grade = (double)totalGradeForPerson / numWorkoutsForPerson;
-		log.info(person.getId() + ": total grade= " + grade);
-		return grade;
+		double formattedGrade = Utils.formatDouble(grade, 3);		
+		log.info(person.getId() + ": total grade= " + grade + ": formatted grade= " + formattedGrade);
+		return formattedGrade;
 	}
+	
 	
 	/**
 	 * when user updates a new WOD-result, we do not want to re-calc all averages, because it is heavy and expensive to

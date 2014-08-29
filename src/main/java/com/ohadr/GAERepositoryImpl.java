@@ -12,6 +12,7 @@ import com.google.appengine.api.datastore.*;
 import com.ohadr.auth_flows.core.gae.GAEAuthenticationAccountRepositoryImpl;
 import com.ohadr.auth_flows.interfaces.AuthenticationAccountRepository;
 import com.ohadr.cbenchmarkr.core.BenchmarkrAuthenticationFlowsRepositoryImpl;
+import com.ohadr.cbenchmarkr.core.BenchmarkrAuthenticationUserImpl;
 import com.ohadr.cbenchmarkr.interfaces.BenchmarkrAuthenticationUser;
 import com.ohadr.cbenchmarkr.interfaces.ITrainee;
 import com.ohadr.cbenchmarkr.interfaces.IRepository;
@@ -428,16 +429,6 @@ public class GAERepositoryImpl implements IRepository
 
 
 	@Override
-	public void createBenchmarkrAccount(String traineeId, String firstName,
-			String lastName, boolean isMale, Date dateOfBirth)
-			throws BenchmarkrRuntimeException
-	{
-		BenchmarkrAuthenticationFlowsRepositoryImpl benchmarkrAuthenticationFlowsRepository = 
-				(BenchmarkrAuthenticationFlowsRepositoryImpl)authFlowsRepository;
-		benchmarkrAuthenticationFlowsRepository.enrichAccount( traineeId, isMale, dateOfBirth );
-	}
-
-	@Override
 	public void resetRepository()
 	{
 		log.info( "reset Users Repository..." );
@@ -470,5 +461,42 @@ public class GAERepositoryImpl implements IRepository
 			//disable this user in auth-flows (rather than delete it):
 			authFlowsRepository.setDisabled( result.getKey().getName() );
 		}		
+	}
+
+	@Override
+	public void createBenchmarkrAccount(String traineeId, boolean isMale, Date dateOfBirth)
+			throws BenchmarkrRuntimeException
+	{
+        log.info( "creating traineeId: " + traineeId + ", isMale? " + isMale + ", DOB=" + dateOfBirth );
+
+        BenchmarkrAuthenticationFlowsRepositoryImpl benchmarkrAuthenticationFlowsRepository = 
+				(BenchmarkrAuthenticationFlowsRepositoryImpl)authFlowsRepository;
+		benchmarkrAuthenticationFlowsRepository.enrichAccount( traineeId, isMale, dateOfBirth );
+	}
+
+	@Override
+	public void updateBenchmarkrAccount(String traineeId, String firstName,
+			String lastName, Date dateOfBirth)
+	{
+        log.info( "updating traineeId: " + traineeId + ", firstName= " + firstName 
+        		+ ", lastName= " + lastName+ ", DOB=" + dateOfBirth );
+
+        BenchmarkrAuthenticationFlowsRepositoryImpl benchmarkrAuthenticationFlowsRepository = 
+				(BenchmarkrAuthenticationFlowsRepositoryImpl)authFlowsRepository;
+		UserDetails userDetails = benchmarkrAuthenticationFlowsRepository.loadUserByUsername( traineeId );
+		BenchmarkrAuthenticationUserImpl benchmarkrAuthenticationUser = (BenchmarkrAuthenticationUserImpl) userDetails;
+		BenchmarkrAuthenticationUserImpl updatedAuthUser = new BenchmarkrAuthenticationUserImpl(
+				userDetails.getUsername(), 
+				userDetails.getPassword(),
+				userDetails.isEnabled(),
+				benchmarkrAuthenticationUser.getLoginAttemptsLeft(),
+				benchmarkrAuthenticationUser.getPasswordLastChangeDate(),
+				firstName,
+				lastName,
+				userDetails.getAuthorities(),
+				benchmarkrAuthenticationUser.isMale(),
+				dateOfBirth );
+
+		benchmarkrAuthenticationFlowsRepository.updateUser( updatedAuthUser );
 	}
 }
