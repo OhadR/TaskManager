@@ -1,9 +1,13 @@
 package com.ohadr.cbenchmarkr;
 
+import java.util.ArrayList;
+import java.util.Calendar;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Date;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 import org.apache.log4j.Logger;
@@ -15,6 +19,7 @@ import org.springframework.stereotype.Component;
 import com.ohadr.cbenchmarkr.interfaces.ICacheRepository;
 import com.ohadr.cbenchmarkr.interfaces.ITrainee;
 import com.ohadr.cbenchmarkr.utils.MailSenderWrapper;
+import com.ohadr.cbenchmarkr.utils.StatisticsData;
 import com.ohadr.cbenchmarkr.utils.TimedResult;
 
 
@@ -50,7 +55,7 @@ public class Manager implements InitializingBean
 
 	public void addWorkoutForTrainee(String traineeId, Workout workout) throws BenchmarkrRuntimeException 
 	{
-		validateWorkout( workout.getName() );
+		validateWorkout( workout );
 		repository.addWorkoutForTrainee( traineeId, workout );
 		
 		//do not re-calc all averages (@calcAveragesAndGrades()), instead use in-mem averages to calc locally the diff:
@@ -74,9 +79,25 @@ public class Manager implements InitializingBean
 	 * @param workoutName
 	 * @throws BenchmarkrRuntimeException 
 	 */
-	private void validateWorkout(String workoutName) throws BenchmarkrRuntimeException 
+	private void validateWorkout(Workout workout) throws BenchmarkrRuntimeException 
 	{
-		
+		validateWorkoutName( workout.getName() );
+
+		if( workout.getDate().getTime() < 0 )
+		{
+			//ERROR
+			log.error( "date entered was before 1-1-1970 (" + workout.getDate() + ")" );
+			throw new BenchmarkrRuntimeException( "date entered was before 1-1-1970." );
+		}
+	}
+
+	/**
+	 * validate the workout-name exists in the workouts-container.
+	 * @param workoutName
+	 * @throws BenchmarkrRuntimeException 
+	 */
+	private void validateWorkoutName(String workoutName) throws BenchmarkrRuntimeException 
+	{
 		if( ! getAllWorkoutsNames().contains( workoutName ) )
 		{
 			//ERROR
@@ -89,6 +110,7 @@ public class Manager implements InitializingBean
 	{
 		if( needToCalcGrades )
 		{
+			log.info("calc grades is needed - calcing averages&grades");
 			gradesCalculator.calcAveragesAndGrades();
 
 			//place this AFTER the calc, so if we have exception in the calc, we will try to re-calc:
@@ -96,7 +118,7 @@ public class Manager implements InitializingBean
 		}
 		else
 		{
-			log.info("no need to re-calc the averages&grades");
+			log.debug("no need to re-calc the averages&grades");
 		}
 	}
 
@@ -117,7 +139,7 @@ public class Manager implements InitializingBean
 	
 	public List<TimedResult> getWorkoutHistoryForTrainee( String trainee, String workoutName ) throws BenchmarkrRuntimeException
 	{
-		validateWorkout( workoutName );
+		validateWorkoutName( workoutName );
 
 		List<TimedResult> retVal = repository.getWorkoutHistoryForTrainee(trainee, workoutName);
 		log.debug( retVal );
@@ -189,4 +211,53 @@ public class Manager implements InitializingBean
 	}
 
 
+	public void recordStatistics()
+	{
+		StatisticsData data = new StatisticsData();
+		data.numberOfRegisteredUsers = getNumberOfRegisteredUsers();
+		data.numberOfRegisteredResults = getNumberOfRegisteredResults();
+		
+		// save to DB:
+		repository.recordStatistics( data );
+	}
+
+	public Map<String, List<TimedResult>> getRegisteredStatistics()
+	{
+		Map<String, List<TimedResult>> stats = repository.getRegisteredStatistics();
+		// the ret val is based on diffs (unlike the repo, which is accumulation):
+		Map<String, List<TimedResult>> retVal = new HashMap<String, List<TimedResult>>();
+
+		for( String statsEntry : stats.keySet())
+		{
+			List<TimedResult> statsValues = stats.get(statsEntry);
+			List<TimedResult> diffList = new ArrayList<>();
+			for(int i = 1; i < statsValues.size(); ++i)
+			{
+				TimedResult current = statsValues.get( i );
+				TimedResult previous = statsValues.get( i-1 );;
+
+				int diff = current.result - previous.result;
+				previous = current;
+				TimedResult tr = new TimedResult(diff, current.timestamp);
+				diffList.add( tr );				
+			}
+			retVal.put(statsEntry, diffList);
+		}
+		return retVal;
+	}
+
+
+	public void userLoginSuccess(String username)
+	{
+		// TODO Auto-generated method stub
+		
+	}
+
+
+	public void clearCache()
+	{
+		repository.clearCache();
+	}
+
+	
 }

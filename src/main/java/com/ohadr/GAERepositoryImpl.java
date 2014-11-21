@@ -16,12 +16,17 @@ import com.ohadr.cbenchmarkr.core.BenchmarkrAuthenticationUserImpl;
 import com.ohadr.cbenchmarkr.interfaces.BenchmarkrAuthenticationUser;
 import com.ohadr.cbenchmarkr.interfaces.ITrainee;
 import com.ohadr.cbenchmarkr.interfaces.IRepository;
+import com.ohadr.cbenchmarkr.utils.StatisticsData;
 import com.ohadr.cbenchmarkr.utils.TimedResult;
 
 
 @Component
 public class GAERepositoryImpl implements IRepository
 {
+	private static final String STATS__NUMBER_OF_REGISTERED_RESULTS = "numberOfRegisteredResults";
+
+	private static final String STATS__NUMBER_OF_REGISTERED_USERS = "numberOfRegisteredUsers";
+
 	//delimiter of the pairs <timestamp $ result> :
 	private static final String WORKOUT_PAIR_DELIMITER = "~";
 	
@@ -34,6 +39,8 @@ public class GAERepositoryImpl implements IRepository
 
 	private static final String USER_DB_KIND = "Users";
 	private static final String HISTORY_DB_KIND = "History";
+	private static final String STATS_DB_KIND = "Statistics";
+	private static final String STATS_KEY = "Statistics"; 
 
 
 	@Autowired
@@ -151,6 +158,26 @@ public class GAERepositoryImpl implements IRepository
 	private Entity getHistoryEntity(String username)
 	{
 		return getEntityFromDB( username, HISTORY_DB_KIND );
+	}
+
+	/**
+	 * 
+	 * @param key
+	 * @return the required entity. If does not exist - create one and return it.
+	 */
+	private Entity getStatisticsEntity(String key)
+	{
+		Entity dbStats = getEntityFromDB( key, STATS_DB_KIND );
+		
+		//create a new one if does not exist:
+		if( dbStats == null )
+		{
+			log.info("creating a new entity for key " + key );
+			
+			dbStats = new Entity(STATS_DB_KIND, key );		//the username is the key
+		}
+		
+		return dbStats;
 	}
 
 	/**
@@ -378,7 +405,7 @@ public class GAERepositoryImpl implements IRepository
 	 * @param line
 	 * @return
 	 */
-	private List<TimedResult> parseHistoryItem( String line )
+	private static List<TimedResult> parseHistoryItem( String line )
 	{
 		List<TimedResult> retVal = new ArrayList<TimedResult>();
 		
@@ -499,4 +526,62 @@ public class GAERepositoryImpl implements IRepository
 
 		benchmarkrAuthenticationFlowsRepository.updateUser( updatedAuthUser );
 	}
+
+	
+	@Override
+	public Map<String, List<TimedResult>> getRegisteredStatistics() 
+	{
+		log.info("get stats");
+
+		Entity statsEntity = getStatisticsEntity( STATS_KEY );
+
+		if( statsEntity == null )
+		{
+			return null;		//TODO throw exception
+		}
+		
+		String numberOfRegisteredUsers = (String)statsEntity.getProperty(STATS__NUMBER_OF_REGISTERED_USERS);
+		String numberOfRegisteredResults = (String)statsEntity.getProperty(STATS__NUMBER_OF_REGISTERED_RESULTS);
+
+		Map<String, List<TimedResult>> retVal = new HashMap<String, List<TimedResult>>();
+
+		List<TimedResult> usersTimedResults = parseHistoryItem( numberOfRegisteredUsers );
+		retVal.put( STATS__NUMBER_OF_REGISTERED_USERS, usersTimedResults );
+		List<TimedResult> numResultsTimedResults = parseHistoryItem( numberOfRegisteredResults );
+		retVal.put( STATS__NUMBER_OF_REGISTERED_RESULTS, numResultsTimedResults );
+		
+		
+		return retVal;
+	}	
+	
+	
+	@Override
+	public void recordStatistics(StatisticsData statisticsData)
+	{
+		log.debug( "recording statistics" + statisticsData );
+		
+		Entity statsEntity = getStatisticsEntity( STATS_KEY );
+		
+		recordSingleStatistics( statsEntity, STATS__NUMBER_OF_REGISTERED_RESULTS, statisticsData.numberOfRegisteredResults );
+		recordSingleStatistics( statsEntity, STATS__NUMBER_OF_REGISTERED_USERS, statisticsData.numberOfRegisteredUsers);
+
+		datastore.put( statsEntity );	
+	}
+
+
+	private void recordSingleStatistics(Entity statsEntity, String columnName, int value)
+	{
+		String property;
+		if( statsEntity.hasProperty( columnName ))
+		{
+			property = (String) statsEntity.getProperty( columnName );
+			property += HISTORY_WORKOUT_DELIMITER + System.currentTimeMillis() + WORKOUT_PAIR_DELIMITER + value;
+		}
+		else
+		{
+			property = System.currentTimeMillis() + WORKOUT_PAIR_DELIMITER + value;
+		}
+		statsEntity.setProperty( columnName, property );
+	}
 }
+
