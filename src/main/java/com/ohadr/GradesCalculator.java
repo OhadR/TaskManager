@@ -14,6 +14,8 @@ import com.ohadr.cbenchmarkr.utils.Utils;
 @Component
 public class GradesCalculator
 {
+	private static final int NUM_DIGITS_AFTER_DECIMAL_POINT = 2;
+
 	private static Logger log = Logger.getLogger(GradesCalculator.class);
 	
 	@Autowired
@@ -128,7 +130,7 @@ public class GradesCalculator
 
 		log.info(person.getId() + ": totalGradeForPerson= " + totalGradeForPerson + ", numWorkoutsForPerson= " + numWorkoutsForPerson);
 		double grade = (double)totalGradeForPerson / numWorkoutsForPerson;
-		double formattedGrade = Utils.formatDouble(grade, 3);		
+		double formattedGrade = Utils.formatDouble(grade, NUM_DIGITS_AFTER_DECIMAL_POINT);		
 		log.info(person.getId() + ": total grade= " + grade + ": formatted grade= " + formattedGrade);
 		return formattedGrade;
 	}

@@ -1,7 +1,6 @@
 package com.ohadr.cbenchmarkr;
 
 import java.util.ArrayList;
-import java.util.Calendar;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Date;
@@ -75,7 +74,10 @@ public class Manager implements InitializingBean
 
 
 	/**
-	 * validate the workout exists in the workouts-container.
+	 * validate:
+	 * 1. the workout exists in the workouts-container.
+	 * 2. the workout date is not before 1-1-1970.
+	 * 3. the workout date is not in the future.
 	 * @param workoutName
 	 * @throws BenchmarkrRuntimeException 
 	 */
@@ -89,6 +91,14 @@ public class Manager implements InitializingBean
 			log.error( "date entered was before 1-1-1970 (" + workout.getDate() + ")" );
 			throw new BenchmarkrRuntimeException( "date entered was before 1-1-1970." );
 		}
+
+		if( workout.getDate().after( new Date() ) )
+		{
+			//ERROR
+			log.error( "date entered is in the future" );
+			throw new BenchmarkrRuntimeException( "date entered is in the future" );
+		}
+
 	}
 
 	/**
@@ -221,7 +231,12 @@ public class Manager implements InitializingBean
 		repository.recordStatistics( data );
 	}
 
-	public Map<String, List<TimedResult>> getRegisteredStatistics()
+	/**
+	 * 
+	 * @return
+	 * @throws BenchmarkrRuntimeException if statistics entity does not exist in DB.
+	 */
+	public Map<String, List<TimedResult>> getRegisteredStatistics() throws BenchmarkrRuntimeException
 	{
 		Map<String, List<TimedResult>> stats = repository.getRegisteredStatistics();
 		// the ret val is based on diffs (unlike the repo, which is accumulation):
@@ -247,10 +262,14 @@ public class Manager implements InitializingBean
 	}
 
 
-	public void userLoginSuccess(String username)
+	/**
+	 * 
+	 * @param username
+	 * @throws BenchmarkrRuntimeException if username was not found in repository.
+	 */
+	public void userLoginSuccess(String username) throws BenchmarkrRuntimeException
 	{
-		// TODO Auto-generated method stub
-		
+		repository.setUserLoginSuccess( username );
 	}
 
 
@@ -259,5 +278,9 @@ public class Manager implements InitializingBean
 		repository.clearCache();
 	}
 
-	
+	public void handleNotSeenForaWhileUsers() throws BenchmarkrRuntimeException
+	{
+		repository.handleNotSeenForaWhileUsers();
+	}
+
 }

@@ -2,6 +2,7 @@ package com.ohadr.cbenchmarkr;
 
 import java.util.*;
 
+import org.apache.commons.lang3.time.DateUtils;
 import org.apache.log4j.Logger;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.core.userdetails.UserDetails;
@@ -41,6 +42,9 @@ public class GAERepositoryImpl implements IRepository
 	private static final String HISTORY_DB_KIND = "History";
 	private static final String STATS_DB_KIND = "Statistics";
 	private static final String STATS_KEY = "Statistics"; 
+
+	private static final String NEWSLETTERS_DB_KIND = "NewsLetters";
+	private static final String NEWSLETTERS_KEY = "NewsLetters"; 
 
 
 	@Autowired
@@ -173,11 +177,22 @@ public class GAERepositoryImpl implements IRepository
 		if( dbStats == null )
 		{
 			log.info("creating a new entity for key " + key );
-			
-			dbStats = new Entity(STATS_DB_KIND, key );		//the username is the key
+			dbStats = new Entity(STATS_DB_KIND, key );
 		}
 		
 		return dbStats;
+	}
+
+	private Entity getNewslettersEntity()
+	{
+		Entity entity = getEntityFromDB( NEWSLETTERS_KEY, NEWSLETTERS_DB_KIND );
+		//create a new one if does not exist:
+		if( entity == null )
+		{
+			log.info("creating a new entity for key " + NEWSLETTERS_KEY );
+			entity = new Entity(NEWSLETTERS_DB_KIND, NEWSLETTERS_KEY );
+		}
+		return entity;
 	}
 
 	/**
@@ -266,11 +281,11 @@ public class GAERepositoryImpl implements IRepository
 		try
 		{
 			UserDetails authFlowsUser = authFlowsRepository.loadUserByUsername( username );
-			BenchmarkrAuthenticationUser inMemoryAuthenticationUserImpl = (BenchmarkrAuthenticationUser)authFlowsUser;
-			firstName = inMemoryAuthenticationUserImpl.getFirstName();
-			lastName = inMemoryAuthenticationUserImpl.getLastName();
-			isMale = inMemoryAuthenticationUserImpl.isMale();
-			dateOfBirth = inMemoryAuthenticationUserImpl.getDateOfBirth();
+			BenchmarkrAuthenticationUser inMemoryAuthenticationUser = (BenchmarkrAuthenticationUser)authFlowsUser;
+			firstName = inMemoryAuthenticationUser.getFirstName();
+			lastName = inMemoryAuthenticationUser.getLastName();
+			isMale = inMemoryAuthenticationUser.isMale();
+			dateOfBirth = inMemoryAuthenticationUser.getDateOfBirth();
 		} 
 		catch (UsernameNotFoundException e)
 		{
@@ -522,14 +537,15 @@ public class GAERepositoryImpl implements IRepository
 				lastName,
 				userDetails.getAuthorities(),
 				benchmarkrAuthenticationUser.isMale(),
-				dateOfBirth );
+				dateOfBirth,
+				new Date() );
 
 		benchmarkrAuthenticationFlowsRepository.updateUser( updatedAuthUser );
 	}
 
 	
 	@Override
-	public Map<String, List<TimedResult>> getRegisteredStatistics() 
+	public Map<String, List<TimedResult>> getRegisteredStatistics() throws BenchmarkrRuntimeException 
 	{
 		log.info("get stats");
 
@@ -537,7 +553,7 @@ public class GAERepositoryImpl implements IRepository
 
 		if( statsEntity == null )
 		{
-			return null;		//TODO throw exception
+			throw new BenchmarkrRuntimeException("could not find statistics Table in DB");
 		}
 		
 		String numberOfRegisteredUsers = (String)statsEntity.getProperty(STATS__NUMBER_OF_REGISTERED_USERS);
@@ -583,5 +599,95 @@ public class GAERepositoryImpl implements IRepository
 		}
 		statsEntity.setProperty( columnName, property );
 	}
+
+	@Override
+	public void setUserLoginSuccess(String username) throws BenchmarkrRuntimeException
+	{
+        BenchmarkrAuthenticationFlowsRepositoryImpl benchmarkrAuthenticationFlowsRepository = 
+				(BenchmarkrAuthenticationFlowsRepositoryImpl)authFlowsRepository;
+		benchmarkrAuthenticationFlowsRepository.setUserLoginSuccess( username );
+	}
+	
+	
+	public void handleNotSeenForaWhileUsers() throws BenchmarkrRuntimeException
+	{
+		log.info("handleNotSeenForaWhileUsers()");
+		Query q = new Query( GAEAuthenticationAccountRepositoryImpl.AUTH_FLOWS_USER_DB_KIND );
+		PreparedQuery pq = datastore.prepare(q);  
+
+		Date now = new Date();
+		List<TraineeMailAndName> usersToRemind = new ArrayList<TraineeMailAndName>();
+		
+		TraineeMailAndName traineeMailAndName;
+		for (Entity entity : pq.asIterable()) 
+		{
+			String username = (String) entity.getKey().getName();		//the username is the key...
+
+			try
+			{
+				UserDetails authFlowsUser = authFlowsRepository.loadUserByUsername( username );
+				BenchmarkrAuthenticationUser authenticationUser = (BenchmarkrAuthenticationUser)authFlowsUser;
+				Date lastLoginDate = authenticationUser.getLastLoginDate();
+
+				//if last login happened more than a month ago - add this user to the list to receive email:
+				if( lastLoginDate == null || DateUtils.addMonths( lastLoginDate, 1).before( now ) )
+				{
+					traineeMailAndName = new TraineeMailAndName( username,
+							authenticationUser.getFirstName(),
+							authenticationUser.getLastName() );
+					//add to list:
+					usersToRemind.add( traineeMailAndName );
+				}
+			} 
+			catch (UsernameNotFoundException e)
+			{
+				log.error("[CANNOT HAPPEN]: user " + username + " was not found in the auth-flows DB; cannot retrieve his first+last name", e);
+			}
+
+		}	
+		
+		log.info( usersToRemind );
+		//write the list to the DB:
+		writeUsersListToDB( usersToRemind );
+
+	}
+
+	private void writeUsersListToDB(List<TraineeMailAndName> usersToRemind) throws BenchmarkrRuntimeException
+	{
+		Entity entity = getNewslettersEntity();
+
+		if( entity == null )
+		{
+			throw new BenchmarkrRuntimeException("could not find newsletter Table in DB");
+		}
+
+		Text property = new Text( usersToRemind.toString() );
+		entity.setProperty( "notSeenForMonth", property );
+		datastore.put( entity );	
+	}
+	
+	class TraineeMailAndName
+	{
+		String id;		//id == the email of the person
+		String firstName;
+		String lastName;
+		
+		TraineeMailAndName(String id, String firstName, String lastName)
+		{
+			this.id = id;
+			this.firstName = firstName;
+			this.lastName = lastName;
+		}
+		
+		@Override
+		public String toString()
+		{
+			return id + WORKOUT_PAIR_DELIMITER +
+					firstName + WORKOUT_PAIR_DELIMITER +
+					lastName;
+			
+		}
+	}
+
 }
 
