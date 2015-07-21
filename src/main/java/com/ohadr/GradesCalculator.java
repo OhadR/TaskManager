@@ -34,13 +34,24 @@ public class GradesCalculator
 	
 	private void calcAverages()
 	{
-		Map<String, Integer> averageGrades = repository.getAveragesForWorkouts();
+		//calc averages for men:
+		calcAverages( true );
+
+		//calc averages for women:
+		calcAverages( false );	
+	}
+	
+	private void calcAverages( boolean isMen )
+	{
+		//get from repo the relevant (men/women) averages:
+		Map<String, Integer> averageGrades = repository.getAveragesForWorkouts( isMen );
 
 		//calc the averages for all wods:
-		log.info("calc the averages");
+		log.info("calc the averages for " + (isMen ? "men" : "women"));
 		
 		Collection<ITrainee> allTrainees = repository.getTraineesCache().values();
 
+		//iterate all WODs (by name):
 		for( String wod : workoutMetadataContainer.getAllWorkoutsNames() )
 		{
 			log.debug( "calc the averages for " + wod );
@@ -49,6 +60,10 @@ public class GradesCalculator
 			
 			for(ITrainee trainee : allTrainees)
 			{
+				if( trainee.isMale() != isMen )
+				{
+					continue;
+				}
 				Map<String, Integer> resultsOfSomeone = trainee.getResultsMap();
 				Integer wodResult = resultsOfSomeone.get( wod );
 				if(wodResult != null)		//in case a person did not do this workout
@@ -68,7 +83,7 @@ public class GradesCalculator
 			averageGrades.put(wod, average);
 			log.info( "averages for " + wod + ": " + average + " (" + workoutParticipants + " participants)");
 		}		
-	}
+	}	
 	
 	/**
 	 * after we have calc'ed the averages, we can calc the distance from this average, per each person.
@@ -93,7 +108,7 @@ public class GradesCalculator
 	private double calcGradeForTrainee(	ITrainee person )
 	{
 		log.info("calc the grades for " + person.getId());
-		Map<String, Integer> averageGrades = repository.getAveragesForWorkouts();
+		Map<String, Integer> averageGrades = repository.getAveragesForWorkouts( person.isMale() );
 		
 		if( averageGrades.isEmpty() )
 		{

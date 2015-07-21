@@ -72,6 +72,32 @@ public class Manager implements InitializingBean
 						
 	}
 
+	/**
+	 * if a user has entered a wrong value to his workout, he can "override" it with a new one. but in case
+	 * he has entered a workout by mistake and wants to completely erase this workout - we use this method:
+	 * @param traineeId
+	 * @param workout
+	 * @throws BenchmarkrRuntimeException
+	 */
+	public void removeWorkoutForTrainee(String traineeId, Workout workout) throws BenchmarkrRuntimeException 
+	{
+		validateWorkout( workout );
+		repository.removeWorkoutForTrainee( traineeId, workout );
+		
+		//do not re-calc all averages (@calcAveragesAndGrades()), instead use in-mem averages to calc locally the diff:
+		double grade = gradesCalculator.recalcForTrainee( traineeId, workout );
+		log.debug( traineeId + ": new total grade (averages were not calced!)= " + grade );
+		ITrainee trainee = repository.getTraineesCache().get( traineeId );
+		trainee.setTotalGrade( grade );
+		
+		//indicate that averages and grades need to be re-calced:
+		needToCalcGrades = true;
+		
+		mailSenderWrapper.notifyAdmin("ohad.redlich@gmail.com",
+				"cBenchmarkr: workout was removed",
+				"user " + traineeId + " has removed WOD-result for " + workout.getName() );
+						
+	}
 
 	/**
 	 * validate:
@@ -275,6 +301,9 @@ public class Manager implements InitializingBean
 
 	public void clearCache()
 	{
+		//indicate that averages and grades need to be re-calced:
+		needToCalcGrades = true;
+
 		repository.clearCache();
 	}
 

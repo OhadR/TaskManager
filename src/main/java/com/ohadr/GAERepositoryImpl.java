@@ -58,8 +58,7 @@ public class GAERepositoryImpl implements IRepository
 	}
 
 	/**
-	 * this method adds the workout both to "user" table, and to the "hostory" table. It also makes sure that @workout does not already exist. 
-	 * @throws BenchmarkrRuntimeException - if this workout already exists
+	 * this method adds the workout both to "user" table, and to the "history" table. It also makes sure that @workout does not already exist. 
 	 */
 	@Override
 	public void addWorkoutForTrainee(String trainee, Workout workout) throws BenchmarkrRuntimeException 
@@ -85,6 +84,28 @@ public class GAERepositoryImpl implements IRepository
 		
 		datastore.put( dbUser );
 		datastore.put( historyEntity );
+	}
+
+	@Override
+	public void removeWorkoutForTrainee(String traineeId, Workout workout) throws BenchmarkrRuntimeException
+	{
+		log.debug("removing workout " + workout + "for user: " + traineeId);
+		
+		Entity dbUser = getUserEntity( traineeId );
+		
+		//if no workouts were registered for this user, the db-entry will be null:
+		if( dbUser == null )
+		{
+			throw new BenchmarkrRuntimeException("no workouts were registered for user " + traineeId);
+		}
+
+		dbUser.removeProperty(workout.getName());
+
+		//TODO:
+		//Entity historyEntity = removeWorkoutForTraineeInHistoryTable( traineeId, workout );
+		//datastore.put( historyEntity );
+		
+		datastore.put( dbUser );
 	}
 	
 	/**
