@@ -99,15 +99,52 @@ public class GAERepositoryImpl implements IRepository
 			throw new BenchmarkrRuntimeException("no workouts were registered for user " + traineeId);
 		}
 
-		dbUser.removeProperty(workout.getName());
+		if( dbUser.hasProperty( workout.getName() ) )
+		{	
+			dbUser.removeProperty(workout.getName());
+		}
+		else
+		{
+			throw new BenchmarkrRuntimeException("workout " + workout.getName() + "does not exist for user " + traineeId);
+		}
 
-		//TODO:
-		//Entity historyEntity = removeWorkoutForTraineeInHistoryTable( traineeId, workout );
-		//datastore.put( historyEntity );
+		//remove also from history-table:
+		Entity historyEntity = removeWorkoutForTraineeInHistoryTable( traineeId, workout );
 		
 		datastore.put( dbUser );
+		datastore.put( historyEntity );
 	}
 	
+	/**
+	 * removes a workout from the history table of the trainee. if this workout does not exists, it throws an exception
+	 * @param trainee
+	 * @param workout
+	 * @return
+	 * @throws BenchmarkrRuntimeException - if this workout does not exists
+	 */
+	private Entity removeWorkoutForTraineeInHistoryTable(String traineeId,
+			Workout workout) throws BenchmarkrRuntimeException
+	{
+		Entity historyEntity = getHistoryEntity( traineeId );
+		//create a new one if does not exist:
+		//TODO reconsider whether to throw here an exception. user must exist for user.
+		if( historyEntity == null )
+		{
+			throw new BenchmarkrRuntimeException( "Could not remove workout; history table is empty for trainee " + traineeId );
+		}
+		
+		String property;
+		if( historyEntity.hasProperty( workout.getName() ))
+		{
+			historyEntity.removeProperty( workout.getName() );
+		}
+		else
+		{
+			throw new BenchmarkrRuntimeException( "Could not remove workout; workout " + workout.getName() + " does not exist in HISTORY TABLE for trainee " + traineeId );
+		}
+		return historyEntity;	
+	}
+
 	/**
 	 * add workout to the history table of the trainee. if this workout already exists, it throws an exception
 	 * @param trainee
