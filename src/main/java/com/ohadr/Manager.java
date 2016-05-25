@@ -306,10 +306,4 @@ public class Manager implements InitializingBean
 
 		repository.clearCache();
 	}
-
-	public void handleNotSeenForaWhileUsers() throws BenchmarkrRuntimeException
-	{
-		repository.handleNotSeenForaWhileUsers();
-	}
-
 }

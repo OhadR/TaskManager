@@ -10,10 +10,9 @@ import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.stereotype.Component;
 
 import com.google.appengine.api.datastore.*;
-import com.ohadr.auth_flows.core.gae.GAEAuthenticationAccountRepositoryImpl;
-import com.ohadr.auth_flows.interfaces.AuthenticationAccountRepository;
-import com.ohadr.cbenchmarkr.core.BenchmarkrAuthenticationFlowsRepositoryImpl;
-import com.ohadr.cbenchmarkr.core.BenchmarkrAuthenticationUserImpl;
+//import com.ohadr.auth_flows.core.gae.GAEAuthenticationAccountRepositoryImpl;
+//import com.ohadr.auth_flows.interfaces.AuthenticationAccountRepository;
+//import com.ohadr.cbenchmarkr.core.BenchmarkrAuthenticationUserImpl;
 import com.ohadr.cbenchmarkr.interfaces.BenchmarkrAuthenticationUser;
 import com.ohadr.cbenchmarkr.interfaces.ITrainee;
 import com.ohadr.cbenchmarkr.interfaces.IRepository;
@@ -47,8 +46,8 @@ public class GAERepositoryImpl implements IRepository
 	private static final String NEWSLETTERS_KEY = "NewsLetters"; 
 
 
-	@Autowired
-	private AuthenticationAccountRepository authFlowsRepository;
+//	@Autowired
+//	private AuthenticationAccountRepository authFlowsRepository;
 
 	private DatastoreService datastore;
 
@@ -201,6 +200,15 @@ public class GAERepositoryImpl implements IRepository
 		}		
 	}
 
+	@Override
+	public void setUserLoginSuccess(String username) throws BenchmarkrRuntimeException
+	{
+ /*       BenchmarkrAuthenticationFlowsRepositoryImpl benchmarkrAuthenticationFlowsRepository = 
+				(BenchmarkrAuthenticationFlowsRepositoryImpl)authFlowsRepository;
+		benchmarkrAuthenticationFlowsRepository.setUserLoginSuccess( username );
+*/	}
+
+	
 	public void removeUsersOrders(List<String> usersToRemove) 
 	{
 		for(String user : usersToRemove)
@@ -338,7 +346,7 @@ public class GAERepositoryImpl implements IRepository
 		Date dateOfBirth = null;
 		try
 		{
-			UserDetails authFlowsUser = authFlowsRepository.loadUserByUsername( username );
+			UserDetails authFlowsUser = null;//ohad authFlowsRepository.loadUserByUsername( username );
 			BenchmarkrAuthenticationUser inMemoryAuthenticationUser = (BenchmarkrAuthenticationUser)authFlowsUser;
 			firstName = inMemoryAuthenticationUser.getFirstName();
 			lastName = inMemoryAuthenticationUser.getLastName();
@@ -500,14 +508,14 @@ public class GAERepositoryImpl implements IRepository
 	@Override
 	public void setAdmin(String authenticatedUsername) 
 	{
-		authFlowsRepository.setAuthority( authenticatedUsername, "ROLE_ADMIN" );
+	//ohad	authFlowsRepository.setAuthority( authenticatedUsername, "ROLE_ADMIN" );
 	}
 
 	@Override
 	public int getNumberOfRegisteredUsers()
 	{
 		int retVal = 0;
-
+/*ohad TODO
 		//will not work on devserver, but OK on production:
 		Query q = new Query("__Stat_Kind__");
 		PreparedQuery global = datastore.prepare( q );
@@ -523,7 +531,7 @@ public class GAERepositoryImpl implements IRepository
 				retVal = totalEntities.intValue();
 				break;
 		    }
-		}
+		}*/
 		return retVal;
 	}
 
@@ -531,7 +539,7 @@ public class GAERepositoryImpl implements IRepository
 	@Override
 	public void resetRepository()
 	{
-		log.info( "reset Users Repository..." );
+/*ohad TODO		log.info( "reset Users Repository..." );
 		Query q = new Query( USER_DB_KIND );
 		PreparedQuery pq = datastore.prepare( q );  
 
@@ -560,7 +568,7 @@ public class GAERepositoryImpl implements IRepository
 //			datastore.delete( result.getKey() );
 			//disable this user in auth-flows (rather than delete it):
 			authFlowsRepository.setDisabled( result.getKey().getName() );
-		}		
+		}*/		
 	}
 
 	@Override
@@ -569,16 +577,16 @@ public class GAERepositoryImpl implements IRepository
 	{
         log.info( "creating traineeId: " + traineeId + ", isMale? " + isMale + ", DOB=" + dateOfBirth );
 
-        BenchmarkrAuthenticationFlowsRepositoryImpl benchmarkrAuthenticationFlowsRepository = 
+/*ohad TODO delete?        BenchmarkrAuthenticationFlowsRepositoryImpl benchmarkrAuthenticationFlowsRepository = 
 				(BenchmarkrAuthenticationFlowsRepositoryImpl)authFlowsRepository;
 		benchmarkrAuthenticationFlowsRepository.enrichAccount( traineeId, isMale, dateOfBirth );
-	}
+	*/}
 
 	@Override
 	public void updateBenchmarkrAccount(String traineeId, String firstName,
 			String lastName, Date dateOfBirth)
 	{
-        log.info( "updating traineeId: " + traineeId + ", firstName= " + firstName 
+   /*ohad TODO delete?     log.info( "updating traineeId: " + traineeId + ", firstName= " + firstName 
         		+ ", lastName= " + lastName+ ", DOB=" + dateOfBirth );
 
         BenchmarkrAuthenticationFlowsRepositoryImpl benchmarkrAuthenticationFlowsRepository = 
@@ -599,7 +607,7 @@ public class GAERepositoryImpl implements IRepository
 				new Date() );
 
 		benchmarkrAuthenticationFlowsRepository.updateUser( updatedAuthUser );
-	}
+	*/}
 
 	
 	@Override
@@ -658,72 +666,7 @@ public class GAERepositoryImpl implements IRepository
 		statsEntity.setProperty( columnName, property );
 	}
 
-	@Override
-	public void setUserLoginSuccess(String username) throws BenchmarkrRuntimeException
-	{
-        BenchmarkrAuthenticationFlowsRepositoryImpl benchmarkrAuthenticationFlowsRepository = 
-				(BenchmarkrAuthenticationFlowsRepositoryImpl)authFlowsRepository;
-		benchmarkrAuthenticationFlowsRepository.setUserLoginSuccess( username );
-	}
-	
-	
-	public void handleNotSeenForaWhileUsers() throws BenchmarkrRuntimeException
-	{
-		log.info("handleNotSeenForaWhileUsers()");
-		Query q = new Query( GAEAuthenticationAccountRepositoryImpl.AUTH_FLOWS_USER_DB_KIND );
-		PreparedQuery pq = datastore.prepare(q);  
 
-		Date now = new Date();
-		List<TraineeMailAndName> usersToRemind = new ArrayList<TraineeMailAndName>();
-		
-		TraineeMailAndName traineeMailAndName;
-		for (Entity entity : pq.asIterable()) 
-		{
-			String username = (String) entity.getKey().getName();		//the username is the key...
-
-			try
-			{
-				UserDetails authFlowsUser = authFlowsRepository.loadUserByUsername( username );
-				BenchmarkrAuthenticationUser authenticationUser = (BenchmarkrAuthenticationUser)authFlowsUser;
-				Date lastLoginDate = authenticationUser.getLastLoginDate();
-
-				//if last login happened more than a month ago - add this user to the list to receive email:
-				if( lastLoginDate == null || DateUtils.addMonths( lastLoginDate, 1).before( now ) )
-				{
-					traineeMailAndName = new TraineeMailAndName( username,
-							authenticationUser.getFirstName(),
-							authenticationUser.getLastName() );
-					//add to list:
-					usersToRemind.add( traineeMailAndName );
-				}
-			} 
-			catch (UsernameNotFoundException e)
-			{
-				log.error("[CANNOT HAPPEN]: user " + username + " was not found in the auth-flows DB; cannot retrieve his first+last name", e);
-			}
-
-		}	
-		
-		log.info( usersToRemind );
-		//write the list to the DB:
-		writeUsersListToDB( usersToRemind );
-
-	}
-
-	private void writeUsersListToDB(List<TraineeMailAndName> usersToRemind) throws BenchmarkrRuntimeException
-	{
-		Entity entity = getNewslettersEntity();
-
-		if( entity == null )
-		{
-			throw new BenchmarkrRuntimeException("could not find newsletter Table in DB");
-		}
-
-		Text property = new Text( usersToRemind.toString() );
-		entity.setProperty( "notSeenForMonth", property );
-		datastore.put( entity );	
-	}
-	
 	class TraineeMailAndName
 	{
 		String id;		//id == the email of the person
