@@ -2,7 +2,6 @@ package com.ohadr.cbenchmarkr;
 
 import java.util.*;
 
-import org.apache.commons.lang3.time.DateUtils;
 import org.apache.log4j.Logger;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.core.userdetails.UserDetails;
@@ -10,11 +9,9 @@ import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.stereotype.Component;
 
 import com.google.appengine.api.datastore.*;
-//import com.ohadr.auth_flows.core.gae.GAEAuthenticationAccountRepositoryImpl;
-//import com.ohadr.auth_flows.interfaces.AuthenticationAccountRepository;
-//import com.ohadr.cbenchmarkr.core.BenchmarkrAuthenticationUserImpl;
-import com.ohadr.cbenchmarkr.interfaces.BenchmarkrAuthenticationUser;
 import com.ohadr.cbenchmarkr.interfaces.ITrainee;
+import com.ohadr.cbenchmarkr.core.BenchmarkrUserDetailsImpl;
+import com.ohadr.cbenchmarkr.interfaces.BenchmarkrUserDetails;
 import com.ohadr.cbenchmarkr.interfaces.IRepository;
 import com.ohadr.cbenchmarkr.utils.StatisticsData;
 import com.ohadr.cbenchmarkr.utils.TimedResult;
@@ -46,8 +43,8 @@ public class GAERepositoryImpl implements IRepository
 	private static final String NEWSLETTERS_KEY = "NewsLetters"; 
 
 
-//	@Autowired
-//	private AuthenticationAccountRepository authFlowsRepository;
+	@Autowired
+	private GAEAccountRepositoryImpl authFlowsRepository;  //GAEAccountRepositoryImpl  implements UserDetailsManager
 
 	private DatastoreService datastore;
 
@@ -203,10 +200,8 @@ public class GAERepositoryImpl implements IRepository
 	@Override
 	public void setUserLoginSuccess(String username) throws BenchmarkrRuntimeException
 	{
- /*       BenchmarkrAuthenticationFlowsRepositoryImpl benchmarkrAuthenticationFlowsRepository = 
-				(BenchmarkrAuthenticationFlowsRepositoryImpl)authFlowsRepository;
-		benchmarkrAuthenticationFlowsRepository.setUserLoginSuccess( username );
-*/	}
+		authFlowsRepository.setUserLoginSuccess( username );
+	}
 
 	
 	public void removeUsersOrders(List<String> usersToRemove) 
@@ -343,15 +338,13 @@ public class GAERepositoryImpl implements IRepository
 		String firstName = null;
 		String lastName = null;
 		boolean isMale = true;
-		Date dateOfBirth = null;
 		try
 		{
-			UserDetails authFlowsUser = null;//ohad authFlowsRepository.loadUserByUsername( username );
-			BenchmarkrAuthenticationUser inMemoryAuthenticationUser = (BenchmarkrAuthenticationUser)authFlowsUser;
+			UserDetails authFlowsUser = authFlowsRepository.loadUserByUsername( username );
+			BenchmarkrUserDetails inMemoryAuthenticationUser = (BenchmarkrUserDetails)authFlowsUser;
 			firstName = inMemoryAuthenticationUser.getFirstName();
 			lastName = inMemoryAuthenticationUser.getLastName();
 			isMale = inMemoryAuthenticationUser.isMale();
-			dateOfBirth = inMemoryAuthenticationUser.getDateOfBirth();
 		} 
 		catch (UsernameNotFoundException e)
 		{
@@ -382,8 +375,7 @@ public class GAERepositoryImpl implements IRepository
 				lastName,
 				traineeResults,
 				totaGrade, 
-				isMale, 
-				dateOfBirth);
+				isMale);
 
 		return trainee;
 	}
@@ -508,7 +500,7 @@ public class GAERepositoryImpl implements IRepository
 	@Override
 	public void setAdmin(String authenticatedUsername) 
 	{
-	//ohad	authFlowsRepository.setAuthority( authenticatedUsername, "ROLE_ADMIN" );
+		authFlowsRepository.setAuthority( authenticatedUsername, "ROLE_ADMIN" );
 	}
 
 	@Override
@@ -572,15 +564,18 @@ public class GAERepositoryImpl implements IRepository
 	}
 
 	@Override
-	public void createBenchmarkrAccount(String traineeId, boolean isMale, Date dateOfBirth)
-			throws BenchmarkrRuntimeException
+	public void createBenchmarkrAccount(String traineeId, 
+			String firstName,
+			String lastName,
+			boolean isMale)
 	{
-        log.info( "creating traineeId: " + traineeId + ", isMale? " + isMale + ", DOB=" + dateOfBirth );
+        log.info( "creating traineeId: " + traineeId + ", isMale? " + isMale );
 
-/*ohad TODO delete?        BenchmarkrAuthenticationFlowsRepositoryImpl benchmarkrAuthenticationFlowsRepository = 
-				(BenchmarkrAuthenticationFlowsRepositoryImpl)authFlowsRepository;
-		benchmarkrAuthenticationFlowsRepository.enrichAccount( traineeId, isMale, dateOfBirth );
-	*/}
+		BenchmarkrUserDetails inMemoryAuthenticationUser = new BenchmarkrUserDetailsImpl( 
+				traineeId, firstName, lastName, null, isMale, new Date() );
+
+        authFlowsRepository.createUser( inMemoryAuthenticationUser );
+	}
 
 	@Override
 	public void updateBenchmarkrAccount(String traineeId, String firstName,

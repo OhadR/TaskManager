@@ -212,10 +212,13 @@ public class Manager implements InitializingBean
 	}
 
 
-	public void createBenchmarkrAccount(String traineeId, boolean isMale,
+	public void createBenchmarkrAccount(String traineeId, 
+			String firstName,
+			String lastName,
+			boolean isMale,
 			Date dateOfBirth) throws BenchmarkrRuntimeException 
 	{
-		repository.createBenchmarkrAccount( traineeId, isMale, dateOfBirth );
+		repository.createBenchmarkrAccount( traineeId, firstName, lastName, isMale );
 		
 		//if it is 'ohad.redlich' - make it admin
 		setAdmin( traineeId );
