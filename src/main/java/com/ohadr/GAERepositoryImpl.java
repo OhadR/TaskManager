@@ -341,10 +341,10 @@ public class GAERepositoryImpl implements IRepository
 		try
 		{
 			UserDetails authFlowsUser = authFlowsRepository.loadUserByUsername( username );
-			BenchmarkrUserDetails inMemoryAuthenticationUser = (BenchmarkrUserDetails)authFlowsUser;
-			firstName = inMemoryAuthenticationUser.getFirstName();
-			lastName = inMemoryAuthenticationUser.getLastName();
-			isMale = inMemoryAuthenticationUser.isMale();
+			BenchmarkrUserDetails userDetails = (BenchmarkrUserDetails)authFlowsUser;
+			firstName = userDetails.getFirstName();
+			lastName = userDetails.getLastName();
+			isMale = userDetails.isMale();
 		} 
 		catch (UsernameNotFoundException e)
 		{

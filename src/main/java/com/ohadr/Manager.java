@@ -309,4 +309,14 @@ public class Manager implements InitializingBean
 
 		repository.clearCache();
 	}
+
+
+	public void createBenchmarkrAccount(String traineeId, String firstName, String lastName, boolean isMale) 
+	{
+		mailSenderWrapper.notifyAdmin("ohad.redlich@gmail.com",
+				"cBenchmarkr: " + firstName + " " + lastName + " logged in",
+				"user " + firstName + " " + lastName + " has logged in" );
+
+		repository.createBenchmarkrAccount(traineeId, firstName, lastName, isMale);
+	}
 }
