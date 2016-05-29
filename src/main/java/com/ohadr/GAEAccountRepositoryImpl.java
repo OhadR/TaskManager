@@ -69,6 +69,17 @@ public class GAEAccountRepositoryImpl implements UserDetailsManager
 		String firstName = (String)entity.getProperty(FIRST_NAME_PROP_NAME);
 		String lastName = (String)entity.getProperty(LAST_NAME_PROP_NAME);
 
+		boolean isMale = true;
+		if( entity.hasProperty( IS_MALE_PROP_NAME ) )
+		{
+			isMale = (Boolean) entity.getProperty( IS_MALE_PROP_NAME ) ;
+			log.debug(username + "/isMale=" + isMale);
+		}
+		else
+		{
+			log.error("isMale not found for user " + username);
+		}
+		 
 		String roleName = (String)entity.getProperty(AUTHORITIES_PROP_NAME);
 		GrantedAuthority userAuth = new SimpleGrantedAuthority(roleName);
 		Collection<GrantedAuthority>  authSet = new HashSet<GrantedAuthority>();
