@@ -39,9 +39,6 @@ public class GAERepositoryImpl implements IRepository
 	private static final String STATS_DB_KIND = "Statistics";
 	private static final String STATS_KEY = "Statistics"; 
 
-	private static final String NEWSLETTERS_DB_KIND = "NewsLetters";
-	private static final String NEWSLETTERS_KEY = "NewsLetters"; 
-
 
 	@Autowired
 	private GAEAccountRepositoryImpl authFlowsRepository;  //GAEAccountRepositoryImpl  implements UserDetailsManager
@@ -129,7 +126,6 @@ public class GAERepositoryImpl implements IRepository
 			throw new BenchmarkrRuntimeException( "Could not remove workout; history table is empty for trainee " + traineeId );
 		}
 		
-		String property;
 		if( historyEntity.hasProperty( workout.getName() ))
 		{
 			historyEntity.removeProperty( workout.getName() );
@@ -242,18 +238,6 @@ public class GAERepositoryImpl implements IRepository
 		}
 		
 		return dbStats;
-	}
-
-	private Entity getNewslettersEntity()
-	{
-		Entity entity = getEntityFromDB( NEWSLETTERS_KEY, NEWSLETTERS_DB_KIND );
-		//create a new one if does not exist:
-		if( entity == null )
-		{
-			log.info("creating a new entity for key " + NEWSLETTERS_KEY );
-			entity = new Entity(NEWSLETTERS_DB_KIND, NEWSLETTERS_KEY );
-		}
-		return entity;
 	}
 
 	/**
